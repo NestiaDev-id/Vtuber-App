@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5); /* slate-900/50 */
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.5); /* slate-600/50 */
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5); /* indigo-500/50 */
+}
+
+/* Transparent mode - for /vtuber window */
+html.transparent-mode,
+body.transparent-mode,
+body.transparent-mode #root {
+  background-color: transparent !important;
+}
+
+/* Main content area transparent, but NOT controls */
+.transparent-mode main,
+.transparent-mode main > div {
+  background-color: transparent !important;
+}

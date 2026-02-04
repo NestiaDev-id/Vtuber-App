@@ -1,0 +1,243 @@
+/* LauncherStage - Genshin-style Loading Screen */
+
+.launcher-stage {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.launcher-backdrop {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #0a0a1f 0%, #1a1a3a 50%, #0f0f2a 100%);
+  animation: backdropPulse 8s ease-in-out infinite;
+}
+
+@keyframes backdropPulse {
+  0%, 100% {
+    background: linear-gradient(135deg, #0a0a1f 0%, #1a1a3a 50%, #0f0f2a 100%);
+  }
+  50% {
+    background: linear-gradient(135deg, #0f0f2a 0%, #1a1a45 50%, #0a0a1f 100%);
+  }
+}
+
+.launcher-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3rem;
+  width: 100%;
+  max-width: 500px;
+}
+
+.launcher-logo {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.launcher-title {
+  font-size: 3rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #fff, #a0a0ff, #fff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  animation: titleShimmer 3s ease-in-out infinite;
+}
+
+@keyframes titleShimmer {
+  0%, 100% {
+    background-position: -200%;
+  }
+  50% {
+    background-position: 200%;
+  }
+}
+
+.launcher-subtitle {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+  margin-top: 0.5rem;
+  font-weight: 300;
+}
+
+.launcher-progress-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.launcher-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.launcher-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease-out;
+  position: relative;
+}
+
+.launcher-progress-fill.checking {
+  width: 100%;
+  background: linear-gradient(90deg, transparent, rgba(100, 149, 237, 0.5), transparent);
+  animation: checkingPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes checkingPulse {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.launcher-progress-fill.downloading {
+  background: linear-gradient(90deg, #4a90e2, #67b8f0, #4a90e2);
+  background-size: 200% 100%;
+  animation: downloadGradient 2s linear infinite;
+}
+
+@keyframes downloadGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+.launcher-progress-fill.patching {
+  background: linear-gradient(90deg, #e2a04a, #f0c767, #e2a04a);
+  background-size: 200% 100%;
+  animation: downloadGradient 2s linear infinite;
+}
+
+.launcher-progress-fill.verifying {
+  background: linear-gradient(90deg, #9b59b6, #b879d1, #9b59b6);
+  background-size: 200% 100%;
+  animation: downloadGradient 2s linear infinite;
+}
+
+.launcher-progress-fill.ready {
+  width: 100% !important;
+  background: linear-gradient(90deg, #2ecc71, #27ae60);
+}
+
+.launcher-progress-fill.error {
+  background: linear-gradient(90deg, #e74c3c, #c0392b);
+}
+
+.launcher-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+}
+
+.launcher-message {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.launcher-bytes {
+  font-family: 'Consolas', 'Monaco', monospace;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+}
+
+.launcher-files-progress {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.75rem;
+}
+
+.launcher-error {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(231, 76, 60, 0.2);
+  border: 1px solid rgba(231, 76, 60, 0.4);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.launcher-error p {
+  color: #ff6b5b;
+  margin-bottom: 0.75rem;
+}
+
+.launcher-error button {
+  padding: 0.5rem 1rem;
+  background: rgba(231, 76, 60, 0.3);
+  border: 1px solid rgba(231, 76, 60, 0.5);
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.launcher-error button:hover {
+  background: rgba(231, 76, 60, 0.5);
+}
+
+.launcher-ready {
+  margin-top: 2rem;
+  animation: readyPop 0.5s ease-out;
+}
+
+@keyframes readyPop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.launcher-ready-icon {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: white;
+  box-shadow: 0 4px 20px rgba(46, 204, 113, 0.4);
+}

@@ -1,0 +1,52 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+dist-ssr
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+
+# Tauri build outputs
+src-tauri/target/
+src-tauri/WixTools/
+src-tauri/binaries/*.exe
+
+# Large assets (delivered via updater instead)
+public/vtuber_chara/
+public/background/
+public/memory/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.exe
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+
+# Rust
+*.rs.bk
+
+# Local development
+*.local
