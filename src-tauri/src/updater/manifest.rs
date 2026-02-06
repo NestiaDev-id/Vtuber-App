@@ -35,6 +35,7 @@ pub struct PatchEntry {
 
 /// Result of comparing local vs remote manifest
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ManifestDiff {
     pub needs_update: bool,
     pub files_to_download: Vec<AssetEntry>,

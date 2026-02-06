@@ -144,13 +144,15 @@ const LauncherStage: React.FC<LauncherStageProps> = ({
           <div className="flex-1 h-full" data-tauri-drag-region></div>
           <button 
             onClick={() => getCurrentWindow().minimize()}
-            className="hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"
+            className="hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 group"
+            title="Minimize"
           >
-            _
+            <div className="w-3 h-[2px] bg-current mt-[2px]"></div>
           </button>
           <button 
             onClick={() => getCurrentWindow().close()}
             className="hover:text-red-500 transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-500/20"
+            title="Close"
           >
             ✕
           </button>
