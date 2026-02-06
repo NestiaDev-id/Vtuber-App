@@ -1,7 +1,7 @@
 import { NewsItem, GameVersion } from './types';
 
 export const CURRENT_VERSION: GameVersion = {
-  version: "1.2.0",
+  version: "0.1.1",
   size: "14.5 GB",
   downloadSizeMB: 4500 // 4.5GB
 };

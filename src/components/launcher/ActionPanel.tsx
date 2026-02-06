@@ -1,12 +1,13 @@
 import React from 'react';
 import { Menu } from 'lucide-react';
-import { LauncherStatus, UpdateProgress } from '../../types';
+import { LauncherStatus, UpdateProgress, ManifestDiff } from '../../types';
 import { CURRENT_VERSION } from '../../constants';
 
 interface ActionPanelProps {
   status: LauncherStatus;
   setStatus: (status: LauncherStatus) => void;
   progress: UpdateProgress | null;
+  manifestDiff: ManifestDiff | null;
   onStartUpdate: () => void;
   onOpenSettings: () => void;
 }
@@ -15,12 +16,20 @@ const ActionPanel: React.FC<ActionPanelProps> = ({
   status, 
   setStatus, 
   progress,
+  manifestDiff,
   onStartUpdate,
   onOpenSettings 
 }) => {
-  // Calculate display values from real progress
+  // Calculate display values from real progress or manifest
   const downloadedMB = progress ? progress.downloadedBytes / 1_000_000 : 0;
-  const totalMB = progress ? progress.totalBytes / 1_000_000 : CURRENT_VERSION.downloadSizeMB;
+  
+  // Use manifestDiff for total size if available, otherwise fallback to constant
+  const totalMB = progress 
+    ? progress.totalBytes / 1_000_000 
+    : manifestDiff 
+      ? manifestDiff.totalDownloadSize / 1_000_000 
+      : CURRENT_VERSION.downloadSizeMB;
+      
   const percentage = totalMB > 0 ? (downloadedMB / totalMB) * 100 : 0;
   
   // Estimate speed (simplified - backend should provide this)
@@ -55,7 +64,7 @@ const ActionPanel: React.FC<ActionPanelProps> = ({
           <div className="flex flex-col items-center">
             <span className="text-xl font-bold tracking-widest">UPDATE</span>
             <span className="text-xs opacity-70">
-              {progress ? `${(progress.totalBytes / 1_000_000).toFixed(0)} MB` : `Ver ${CURRENT_VERSION.version}`}
+              {totalMB > 0 ? `${totalMB.toFixed(2)} MB` : `Ver ${CURRENT_VERSION.version}`}
             </span>
           </div>
         );
