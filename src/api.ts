@@ -641,7 +641,53 @@ export const api = {
       return null;
     }
   },
+
+  // ========================================
+  // Launcher Settings (UI Preferences)
+  // ========================================
+
+  /** Get launcher settings from persistent storage */
+  async getLauncherSettings(): Promise<LauncherSettings> {
+    try {
+      return await invoke("get_launcher_settings");
+    } catch (e) {
+      console.error("Failed to get launcher settings:", e);
+      return {
+        language: "English",
+        autoLaunchOnStartup: false,
+        checkUpdatesOnStartup: true,
+        installationPath: "C:\\Games\\VTuber-App",
+        speedLimitEnabled: false,
+        speedLimitKBps: 4096,
+        allowDesktopNotifications: false,
+        notifyOnUpdate: true,
+        notifyOnDownloadComplete: true,
+      };
+    }
+  },
+
+  /** Save launcher settings to persistent storage */
+  async saveLauncherSettings(settings: LauncherSettings): Promise<string> {
+    try {
+      return await invoke("save_launcher_settings", { settings });
+    } catch (e) {
+      console.error("Failed to save launcher settings:", e);
+      throw new Error(String(e));
+    }
+  },
 };
+
+export interface LauncherSettings {
+  language: string;
+  autoLaunchOnStartup: boolean;
+  checkUpdatesOnStartup: boolean;
+  installationPath: string;
+  speedLimitEnabled: boolean;
+  speedLimitKBps: number;
+  allowDesktopNotifications: boolean;
+  notifyOnUpdate: boolean;
+  notifyOnDownloadComplete: boolean;
+}
 
 export interface CharacterData {
   id: string;

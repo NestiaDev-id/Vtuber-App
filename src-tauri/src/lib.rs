@@ -109,6 +109,8 @@ pub fn run() {
             updater::encryption::check_asset_encryption,
             commands::batch_label_memories,
             commands::get_labeling_stats,
+            commands::get_launcher_settings,
+            commands::save_launcher_settings,
             set_click_through
         ])
         .run(tauri::generate_context!())

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Globe, Download, Bell, Wrench, Info, FolderOpen, Loader2, CheckCircle, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import api from '../../api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Select, 
@@ -16,11 +17,9 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-// Settings state interface
 interface LauncherSettings {
   language: string;
   autoLaunchOnStartup: boolean;
-  minimizeToTray: boolean;
   checkUpdatesOnStartup: boolean;
   installationPath: string;
   speedLimitEnabled: boolean;
@@ -53,7 +52,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [settings, setSettings] = useState<LauncherSettings>({
     language: 'English',
     autoLaunchOnStartup: false,
-    minimizeToTray: false,
     checkUpdatesOnStartup: true,
     installationPath: 'C:\\Games\\VTuber-App',
     speedLimitEnabled: false,
@@ -62,6 +60,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     notifyOnUpdate: true,
     notifyOnDownloadComplete: true,
   });
+  // Load settings from backend when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      api.getLauncherSettings()
+        .then(loadedSettings => {
+          setSettings(loadedSettings);
+        })
+        .catch(err => console.error('Failed to load settings:', err));
+    }
+  }, [isOpen]);
 
   // Diagnosis state
   const [diagnosisStatus, setDiagnosisStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -96,7 +104,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   };
 
   const updateSetting = <K extends keyof LauncherSettings>(key: K, value: LauncherSettings[K]) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+    // Persist to backend
+    api.saveLauncherSettings(newSettings).catch(err => {
+      console.error('Failed to save setting:', err);
+    });
   };
 
   const handleResetSettings = () => {
@@ -104,7 +117,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       setSettings({
         language: 'English',
         autoLaunchOnStartup: false,
-        minimizeToTray: false,
         checkUpdatesOnStartup: true,
         installationPath: 'C:\\Games\\VTuber-App',
         speedLimitEnabled: false,
@@ -216,13 +228,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                           <Toggle enabled={settings.autoLaunchOnStartup} onChange={(v) => updateSetting('autoLaunchOnStartup', v)} />
                         </div>
 
-                        <div className="flex items-center justify-between py-3 border-b border-gray-800">
-                          <div>
-                            <span className="text-gray-300">Minimize to Tray on Close</span>
-                            <p className="text-xs text-gray-500 mt-0.5">Keep the launcher running in the background</p>
-                          </div>
-                          <Toggle enabled={settings.minimizeToTray} onChange={(v) => updateSetting('minimizeToTray', v)} />
-                        </div>
 
                         <div className="flex items-center justify-between py-3 border-b border-gray-800">
                           <div>
