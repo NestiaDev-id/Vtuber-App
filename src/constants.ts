@@ -95,6 +95,23 @@ We apologize for the inconvenience and appreciate your patience. A compensation 
 
 Happy gaming!
 - The Aetheria Dev Team`
+  },
+  {
+    id: '5',
+    title: "Scheduled Maintenance: System Optimization",
+    category: 'NOTICE',
+    date: '2024-06-10',
+    image: 'https://picsum.photos/id/160/600/300',
+    content: `Attention all users,
+
+A scheduled maintenance is planned for June 10th to optimize system performance and database stability.
+
+**Timeline:**
+June 10th, 10:00 AM - 12:00 PM (UTC).
+
+Services might be intermittent during this window. We appreciate your cooperation.
+
+- Operations Team`
   }
 ];
 
