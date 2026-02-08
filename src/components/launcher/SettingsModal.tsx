@@ -255,7 +255,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                             readOnly 
                             className="flex-1 bg-black/30 border border-gray-700 rounded p-2.5 text-gray-300" 
                           />
-                          <button className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm flex items-center gap-2 transition-colors">
+                          <button 
+                            onClick={async () => {
+                              const path = await api.selectDirectory();
+                              if (path) {
+                                updateSetting('installationPath', path);
+                              }
+                            }}
+                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm flex items-center gap-2 transition-colors"
+                          >
                             <FolderOpen size={16} />
                             Browse
                           </button>
