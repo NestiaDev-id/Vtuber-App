@@ -340,70 +340,70 @@ export const api = {
             name: "Hiyori",
             type: "live2d",
             thumbnail: null,
-            path: "/vtuber_chara/hiyori_free_en/runtime/hiyori_free_t08.model3.json"
+            path: "vt-asset://Characters/hiyori_free_en/runtime/hiyori_free_t08.model3.json"
           },
           {
             id: "pachan",
             name: "Pachirisu Girl",
             type: "live2d",
             thumbnail: null,
-            path: "/vtuber_chara/pachan 2.0/pachirisu anime girl - top half.model3.json"
+            path: "vt-asset://Characters/pachan 2.0/pachirisu anime girl - top half.model3.json"
           },
           {
             id: "witch",
             name: "Witch",
             type: "live2d",
             thumbnail: null,
-            path: "/vtuber_chara/Witch/魔女.model3.json" 
+            path: "vt-asset://Characters/Witch/魔女.model3.json" 
           },
           {
             id: "kamiyahakuko",
             name: "Kamiyahakuko",
             type: "live2d",
             thumbnail: null,
-            path: "/vtuber_chara/Kamiyahakuko/神宫白子模型/面饼0.model3.json"
+            path: "vt-asset://Characters/Kamiyahakuko/神宫白子模型/面饼0.model3.json"
           },
           {
             id: "hiyori_pro",
             name: "Hiyori Pro",
             type: "live2d",
             thumbnail: null,
-            path: "/vtuber_chara/hiyori_pro_en/runtime/hiyori_pro_t11.model3.json"
+            path: "vt-asset://Characters/hiyori_pro_en/runtime/hiyori_pro_t11.model3.json"
           },
           {
             id: "mao_pro",
             name: "Mao Pro",
             type: "live2d",
             thumbnail: null,
-            path: "/vtuber_chara/mao_pro/runtime/mao_pro.model3.json"
+            path: "vt-asset://Characters/mao_pro/runtime/mao_pro.model3.json"
           },
           {
             id: "miara_pro",
             name: "Miara Pro",
             type: "live2d",
             thumbnail: null,
-            path: "/vtuber_chara/miara_pro_en/runtime/miara_pro_t03.model3.json"
+            path: "vt-asset://Characters/miara_pro_en/runtime/miara_pro_t03.model3.json"
           },
           {
             id: "shizuku",
             name: "Shizuku",
             type: "live2d",
             thumbnail: null,
-            path: "/vtuber_chara/shizuku/runtime/shizuku.model3.json"
+            path: "vt-asset://Characters/shizuku/runtime/shizuku.model3.json"
           },
           {
             id: "tsumiki",
             name: "Tsumiki",
             type: "live2d",
             thumbnail: null,
-            path: "/vtuber_chara/tsumiki/runtime/tsumiki.model3.json"
+            path: "vt-asset://Characters/tsumiki/runtime/tsumiki.model3.json"
           },
           {
             id: "haru_greeter",
             name: "Haru Greeter",
             type: "live2d",
             thumbnail: null,
-            path: "/vtuber_chara/haru_greeter_pro_jp/runtime/haru_greeter_t05.model3.json"
+            path: "vt-asset://Characters/haru_greeter_pro_jp/runtime/haru_greeter_t05.model3.json"
           }
         ],
         active_character: savedChar

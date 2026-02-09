@@ -30,17 +30,20 @@ pub fn run() {
             let uri = request.uri().path();
             let app = ctx.app_handle();
             
-            // Get asset path from URI
-            let data_dir = app.path().app_data_dir()
-                .unwrap_or_else(|_| PathBuf::from("."));
-            let asset_path = data_dir.join("assets").join(uri.trim_start_matches('/'));
+            // Get asset path from URI - resolve relative to executable directory
+            let exe_dir = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+                .unwrap_or_else(|| std::path::PathBuf::from("."));
+            
+            let asset_path = exe_dir.join("Content").join(uri.trim_start_matches('/'));
             
             // Check if file exists
             if !asset_path.exists() {
                 return tauri::http::Response::builder()
                     .status(404)
                     .header("Content-Type", "text/plain")
-                    .body(Vec::from("Asset not found"))
+                    .body(Vec::from(format!("Asset not found: {:?}", asset_path)))
                     .unwrap();
             }
             

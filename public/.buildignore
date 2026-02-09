@@ -1,0 +1,4 @@
+# Files/folders in this directory that should NOT be included in production build
+# These assets are downloaded separately by the Mini-Installer
+
+vtuber_chara/

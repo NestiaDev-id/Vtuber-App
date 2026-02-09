@@ -28,6 +28,7 @@ src-tauri/binaries/*.exe
 public/vtuber_chara/
 public/background/
 public/memory/
+installer_project/
 
 # Editor directories and files
 .vscode/*

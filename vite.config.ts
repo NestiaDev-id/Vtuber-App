@@ -40,4 +40,12 @@ export default defineConfig(() => ({
     entries: ["index.html", "src/**/*.{ts,tsx}"],
     exclude: ["@tauri-apps/api", "@tauri-apps/plugin-updater", "@tauri-apps/plugin-dialog"],
   },
+  // 5. Exclude heavy assets from production build (downloaded separately via installer)
+  build: {
+    rollupOptions: {
+      external: [/^\/vtuber_chara\/.*/],
+    },
+  },
+  // 6. Prevent copying vtuber_chara to dist during build
+  publicDir: "public",
 }));
