@@ -31,6 +31,11 @@ public/memory/
 installer_project/
 keys/
 *.bin
+*.vtenc
+*.vtdec
+*.vtkey
+*.vtkey.bk
+*.txt
 
 # Editor directories and files
 .vscode/*

@@ -1,42 +1,142 @@
 # Build Script for VTuber App Distribution Packages
 # Creates: vtuber_app.zip and content.zip for GitHub Release
+#
+# Prerequisites:
+#   1. Root .env must contain KYBER_PUBLIC_KEY and KYBER_SECRET_KEY
+#   2. Content/Official/ must contain the official assets to encrypt
+#
+# Usage:
+#   .\tools\package_release.ps1                  # Full build + package
+#   .\tools\package_release.ps1 -SkipBuild       # Package only (use existing build)
+#   .\tools\package_release.ps1 -ContentOnly     # Package content only
+#   .\tools\package_release.ps1 -SkipEncryption  # Skip content encryption step
 
 param(
     [switch]$SkipBuild,
-    [switch]$ContentOnly
+    [switch]$ContentOnly,
+    [switch]$SkipEncryption
 )
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 
 Write-Host "=== VTuber App Packaging Script ===" -ForegroundColor Cyan
+Write-Host "  Project Root: $ProjectRoot" -ForegroundColor Gray
 
-# 1. Build the main app (if not skipped)
+# ============================================================
+# Step 0: Validate .env keys exist
+# ============================================================
+Write-Host "`n[0/5] Validating .env for Kyber keys..." -ForegroundColor Yellow
+$EnvFile = Join-Path $ProjectRoot ".env"
+
+if (-not (Test-Path $EnvFile)) {
+    Write-Host "  WARNING: .env not found at $EnvFile" -ForegroundColor Red
+    Write-Host "  Decryption at runtime will NOT work without keys." -ForegroundColor Red
+    Write-Host "  Run: cd src-tauri && cargo run --bin encrypt_content -- --generate-keys" -ForegroundColor Gray
+} else {
+    $envContent = Get-Content $EnvFile -Raw
+    $hasPK = $envContent -match "KYBER_PUBLIC_KEY=.+"
+    $hasSK = $envContent -match "KYBER_SECRET_KEY=.+"
+    
+    if ($hasPK -and $hasSK) {
+        Write-Host "  OK Kyber keys found in .env" -ForegroundColor Green
+    } else {
+        Write-Host "  WARNING: Kyber keys missing in .env" -ForegroundColor Red
+        Write-Host "  Run: cd src-tauri && cargo run --bin encrypt_content -- --generate-keys" -ForegroundColor Gray
+    }
+}
+
+# ============================================================
+# Step 1: Build the main app (if not skipped)
+# ============================================================
 if (-not $SkipBuild -and -not $ContentOnly) {
-    Write-Host "`n[1/4] Building Tauri application..." -ForegroundColor Yellow
+    Write-Host "`n[1/5] Building Tauri application..." -ForegroundColor Yellow
+    Write-Host "  build.rs will inject keys from .env into binary" -ForegroundColor Gray
     Push-Location $ProjectRoot
     npm run tauri build
     Pop-Location
 }
 
-# 2. Create release directory
+# ============================================================
+# Step 2: Encrypt Official Content (if not skipped)
+# ============================================================
+$ContentOfficialDir = Join-Path $ProjectRoot "Content\Official"
+$ContentCustomDir = Join-Path $ProjectRoot "Content\Custom"
+
+if (-not $SkipEncryption -and (Test-Path $ContentOfficialDir)) {
+    Write-Host "`n[2/5] Encrypting Official Content (Kyber-AES-GCM)..." -ForegroundColor Yellow
+    
+    $KeyFile = Join-Path $ProjectRoot "src-tauri\keys\kyber_keypair.bin"
+    if (-not (Test-Path $KeyFile)) {
+        Write-Host "  ERROR: Keypair not found at $KeyFile" -ForegroundColor Red
+        Write-Host "  Run: cd src-tauri && cargo run --bin encrypt_content -- --generate-keys" -ForegroundColor Red
+        exit 1
+    }
+    
+    # Create temp encrypted output
+    $TempEncryptedDir = Join-Path $env:TEMP "vtuber_encrypted_content"
+    if (Test-Path $TempEncryptedDir) { Remove-Item $TempEncryptedDir -Recurse -Force }
+    
+    Push-Location (Join-Path $ProjectRoot "src-tauri")
+    cargo run --bin encrypt_content -- `
+        --input $ContentOfficialDir `
+        --output $TempEncryptedDir `
+        --key-file $KeyFile
+    Pop-Location
+    
+    Write-Host "  OK Official content encrypted" -ForegroundColor Green
+} else {
+    $TempEncryptedDir = $null
+    if ($SkipEncryption) {
+        Write-Host "`n[2/5] Skipping encryption (--SkipEncryption)" -ForegroundColor Gray
+    } else {
+        Write-Host "`n[2/5] No Official content found, skipping encryption" -ForegroundColor Gray
+    }
+}
+
+# ============================================================
+# Step 3: Create release directory
+# ============================================================
 $ReleaseDir = Join-Path $ProjectRoot "release"
 if (-not (Test-Path $ReleaseDir)) {
     New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null
 }
 
-# 3. Package Content (Live2D Characters)
-Write-Host "`n[2/4] Packaging Content (Live2D assets)..." -ForegroundColor Yellow
-$ContentSource = Join-Path $ProjectRoot "public\vtuber_chara"
+# ============================================================
+# Step 4: Package Content ZIP
+# ============================================================
+Write-Host "`n[3/5] Packaging Content ZIP..." -ForegroundColor Yellow
 $ContentZip = Join-Path $ReleaseDir "content.zip"
 
 # Create temp Content structure
 $TempContentDir = Join-Path $env:TEMP "vtuber_content_package"
 if (Test-Path $TempContentDir) { Remove-Item $TempContentDir -Recurse -Force }
-New-Item -ItemType Directory -Path "$TempContentDir\Content\Characters" -Force | Out-Null
 
-# Copy characters to Content/Characters structure
-Copy-Item -Path "$ContentSource\*" -Destination "$TempContentDir\Content\Characters\" -Recurse
+# Structure: Content/Official/ (encrypted) + Content/Custom/ (template)
+New-Item -ItemType Directory -Path "$TempContentDir\Content\Official" -Force | Out-Null
+New-Item -ItemType Directory -Path "$TempContentDir\Content\Custom" -Force | Out-Null
+
+# Copy encrypted official content (if available)
+if ($TempEncryptedDir -and (Test-Path $TempEncryptedDir)) {
+    Copy-Item -Path "$TempEncryptedDir\*" -Destination "$TempContentDir\Content\Official\" -Recurse
+    Remove-Item $TempEncryptedDir -Recurse -Force
+} elseif (Test-Path $ContentOfficialDir) {
+    # Fallback: copy unencrypted official content (dev builds)
+    Copy-Item -Path "$ContentOfficialDir\*" -Destination "$TempContentDir\Content\Official\" -Recurse
+}
+
+# Copy custom content template (if exists)
+if (Test-Path $ContentCustomDir) {
+    Copy-Item -Path "$ContentCustomDir\*" -Destination "$TempContentDir\Content\Custom\" -Recurse
+}
+
+# Also support legacy path (public/vtuber_chara) for backward compatibility
+$LegacyContent = Join-Path $ProjectRoot "public\vtuber_chara"
+if ((Test-Path $LegacyContent) -and -not (Test-Path "$TempContentDir\Content\Official\Characters")) {
+    New-Item -ItemType Directory -Path "$TempContentDir\Content\Official\Characters" -Force | Out-Null
+    Copy-Item -Path "$LegacyContent\*" -Destination "$TempContentDir\Content\Official\Characters\" -Recurse
+    Write-Host "  (Copied from legacy public/vtuber_chara path)" -ForegroundColor Gray
+}
 
 # Create ZIP
 if (Test-Path $ContentZip) { Remove-Item $ContentZip -Force }
@@ -51,8 +151,10 @@ if ($ContentOnly) {
     exit 0
 }
 
-# 4. Package VTuber App (Main executable)
-Write-Host "`n[3/4] Packaging VTuber App..." -ForegroundColor Yellow
+# ============================================================
+# Step 5: Package VTuber App ZIP
+# ============================================================
+Write-Host "`n[4/5] Packaging VTuber App..." -ForegroundColor Yellow
 $AppSource = Join-Path $ProjectRoot "src-tauri\target\release\vtuber-app.exe"
 $AppZip = Join-Path $ReleaseDir "vtuber_app.zip"
 
@@ -78,9 +180,11 @@ Remove-Item $TempAppDir -Recurse -Force
 $AppSize = (Get-Item $AppZip).Length / 1MB
 Write-Host "  Created: vtuber_app.zip ($([math]::Round($AppSize, 2)) MB)" -ForegroundColor Green
 
-# 5. Summary
-Write-Host "`n[4/4] Packaging Complete!" -ForegroundColor Yellow
+# ============================================================
+# Summary
+# ============================================================
+Write-Host "`n[5/5] Packaging Complete!" -ForegroundColor Yellow
 Write-Host "=== Release Artifacts ===" -ForegroundColor Cyan
 Write-Host "  - $AppZip" -ForegroundColor White
 Write-Host "  - $ContentZip" -ForegroundColor White
-Write-Host "`nUpload these to GitHub Releases for distribution." -ForegroundColor Gray
+Write-Host "`n  Upload these to GitHub Releases for distribution." -ForegroundColor Gray
