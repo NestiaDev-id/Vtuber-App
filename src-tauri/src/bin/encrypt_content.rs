@@ -20,13 +20,6 @@ use sha2::{Sha256, Digest};
 const ENCRYPTED_HEADER: &[u8; 8] = b"VTENC002";
 const NONCE_SIZE: usize = 12;
 
-/// XOR mask for key obfuscation (same as in key_obfuscation.rs)
-const XOR_MASK: [u8; 32] = [
-    0x5A, 0x3C, 0x9F, 0x1E, 0x7B, 0x4D, 0x2A, 0x8E,
-    0xC1, 0x6F, 0xB3, 0x0D, 0xE5, 0x92, 0x48, 0xF7,
-    0x21, 0x84, 0xA6, 0x5B, 0xD9, 0x3E, 0x70, 0xCC,
-    0x15, 0x8A, 0xE2, 0x4F, 0x97, 0x63, 0xBD, 0x09,
-];
 
 /// APP Salt for key derivation
 fn get_app_salt() -> Vec<u8> {
@@ -112,7 +105,7 @@ fn main() {
     
     // Generate keys if requested
     if generate_keys {
-        println!("[1/3] Generating Kyber-1024 keypair...");
+        println!("[1/2] Generating Kyber-1024 keypair...");
         let mut rng = KyberRng;
         let keys = keypair(&mut rng).expect("Failed to generate keypair");
         
@@ -127,12 +120,29 @@ fn main() {
         
         println!("  ✓ Keypair saved to: {:?}", key_file);
         
-        // Output obfuscated key parts for embedding
-        println!("\n[2/3] Generating obfuscated key parts for source code...");
-        output_obfuscated_keys(&keys.public, &keys.secret);
+        // Output base64-encoded keys for .env
+        println!("\n[2/2] Base64-encoded keys for .env file:\n");
+        println!("═══════════════════════════════════════════════════════════");
+        println!("  Copy these lines to your root .env file:");
+        println!("═══════════════════════════════════════════════════════════\n");
         
-        println!("\n  ⚠️  IMPORTANT: Copy the above arrays to key_obfuscation.rs");
-        println!("  ⚠️  Keep the keypair file SECURE and DO NOT commit to git!\n");
+        let pk_b64 = base64_encode(&keys.public);
+        let sk_b64 = base64_encode(&keys.secret);
+        
+        println!("KYBER_PUBLIC_KEY={}", pk_b64);
+        println!("KYBER_SECRET_KEY={}", sk_b64);
+        
+        println!("\n═══════════════════════════════════════════════════════════");
+        println!("  ⚠️  IMPORTANT:");
+        println!("  - Paste the above into your .env (NOT .env.example)");
+        println!("  - .env is gitignored — keys will NOT be uploaded to GitHub");
+        println!("  - build.rs will read these at compile time");
+        println!("═══════════════════════════════════════════════════════════\n");
+        
+        // If only generating keys, skip encryption
+        if !input_dir.exists() {
+            return;
+        }
     }
     
     // Load keypair
@@ -266,59 +276,34 @@ fn encrypt_file(
     Ok(output_size)
 }
 
-fn output_obfuscated_keys(public_key: &[u8], secret_key: &[u8]) {
-    println!("\n// === PUBLIC KEY PARTS (1568 bytes total) ===");
+/// Simple base64 encoder (no external deps needed for CLI tool)
+fn base64_encode(data: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::new();
     
-    // Split public key into 3 parts
-    let pk_parts = [
-        &public_key[0..523],
-        &public_key[523..1046],
-        &public_key[1046..1568],
-    ];
-    
-    for (i, part) in pk_parts.iter().enumerate() {
-        let obfuscated: Vec<u8> = part.iter()
-            .enumerate()
-            .map(|(j, b)| b ^ XOR_MASK[j % XOR_MASK.len()])
-            .collect();
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
         
-        println!("\nconst PK_PART_{}: [u8; {}] = [", ['A', 'B', 'C'][i], obfuscated.len());
-        print_bytes_as_array(&obfuscated);
-        println!("];");
-    }
-    
-    println!("\n// === SECRET KEY PARTS (3168 bytes total) ===");
-    
-    // Split secret key into 4 parts
-    let sk_parts = [
-        &secret_key[0..792],
-        &secret_key[792..1584],
-        &secret_key[1584..2376],
-        &secret_key[2376..3168],
-    ];
-    
-    for (i, part) in sk_parts.iter().enumerate() {
-        let obfuscated: Vec<u8> = part.iter()
-            .enumerate()
-            .map(|(j, b)| b ^ XOR_MASK[j % XOR_MASK.len()])
-            .collect();
+        let triple = (b0 << 16) | (b1 << 8) | b2;
         
-        println!("\nconst SK_PART_{}: [u8; {}] = [", i + 1, obfuscated.len());
-        print_bytes_as_array(&obfuscated);
-        println!("];");
-    }
-}
-
-fn print_bytes_as_array(bytes: &[u8]) {
-    for (i, chunk) in bytes.chunks(16).enumerate() {
-        print!("    ");
-        for b in chunk {
-            print!("0x{:02X}, ", b);
+        result.push(TABLE[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(TABLE[((triple >> 12) & 0x3F) as usize] as char);
+        
+        if chunk.len() > 1 {
+            result.push(TABLE[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
         }
-        if i < bytes.len() / 16 {
-            println!();
+        
+        if chunk.len() > 2 {
+            result.push(TABLE[(triple & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
         }
     }
+    result
 }
 
 fn print_help() {
