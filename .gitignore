@@ -29,6 +29,8 @@ public/vtuber_chara/
 public/background/
 public/memory/
 installer_project/
+keys/
+*.bin
 
 # Editor directories and files
 .vscode/*
