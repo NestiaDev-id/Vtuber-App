@@ -25,10 +25,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Custom URI Protocol for encrypted assets
-        // Usage: vt-asset://path/to/encrypted/file.png
+        // Usage: vt-asset://path/to/file.png
+        // Supports both Official (encrypted) and Custom (plain) content
         .register_uri_scheme_protocol("vt-asset", |ctx, request| {
             let uri = request.uri().path();
-            let app = ctx.app_handle();
+            let _app = ctx.app_handle();
             
             // Get asset path from URI - resolve relative to executable directory
             let exe_dir = std::env::current_exe()
@@ -36,7 +37,28 @@ pub fn run() {
                 .and_then(|p| p.parent().map(|p| p.to_path_buf()))
                 .unwrap_or_else(|| std::path::PathBuf::from("."));
             
-            let asset_path = exe_dir.join("Content").join(uri.trim_start_matches('/'));
+            let content_dir = exe_dir.join("Content");
+            let relative_path = uri.trim_start_matches('/');
+            
+            // Priority lookup: Custom (user mods) -> Official (encrypted)
+            // This allows users to override official content with custom mods
+            let custom_path = content_dir.join("Custom").join(relative_path);
+            let official_path = content_dir.join("Official").join(relative_path);
+            
+            // Also check for encrypted version in Official folder
+            let official_vtenc_path = content_dir.join("Official")
+                .join(format!("{}.vtenc", relative_path.trim_end_matches(".model3.json").trim_end_matches(".png").trim_end_matches(".jpg")));
+            
+            let asset_path = if custom_path.exists() {
+                custom_path // User custom content (plain)
+            } else if official_path.exists() {
+                official_path // Official content (may be encrypted)
+            } else if official_vtenc_path.exists() {
+                official_vtenc_path // Encrypted official content
+            } else {
+                // Fallback: direct path under Content/ for backward compatibility
+                content_dir.join(relative_path)
+            };
             
             // Check if file exists
             if !asset_path.exists() {
