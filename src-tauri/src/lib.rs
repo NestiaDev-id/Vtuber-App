@@ -15,8 +15,8 @@ async fn set_click_through(window: tauri::Window, enable: bool) -> Result<(), St
     window.set_ignore_cursor_events(enable)
         .map_err(|e| e.to_string())
 }
-use std::path::PathBuf;
-use tauri::Manager;
+
+
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -88,7 +88,17 @@ pub fn run() {
             };
             
             // Guess content type from extension
-            let content_type = match asset_path.extension().and_then(|e| e.to_str()) {
+            // For .vtenc files, strip the encrypted extension to detect the original type
+            // e.g., "model.png.vtenc" -> detect from "model.png" -> "image/png"
+            let type_path = {
+                let path_str = asset_path.to_string_lossy();
+                if path_str.ends_with(".vtenc") {
+                    std::path::PathBuf::from(path_str.trim_end_matches(".vtenc"))
+                } else {
+                    asset_path.clone()
+                }
+            };
+            let content_type = match type_path.extension().and_then(|e| e.to_str()) {
                 Some("png") => "image/png",
                 Some("jpg") | Some("jpeg") => "image/jpeg",
                 Some("json") => "application/json",

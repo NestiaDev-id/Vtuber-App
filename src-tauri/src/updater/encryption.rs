@@ -298,6 +298,7 @@ pub fn encrypt_file(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
 }
 
 /// Decrypt a file and return contents in memory (no disk write)
+/// Auto-detects V1 (legacy AES) vs V2 (Kyber-AES-GCM) encryption
 pub fn decrypt_file_to_memory(src: &PathBuf) -> Result<Vec<u8>, String> {
     let mut file = std::fs::File::open(src)
         .map_err(|e| format!("Failed to open encrypted file: {}", e))?;
@@ -306,7 +307,20 @@ pub fn decrypt_file_to_memory(src: &PathBuf) -> Result<Vec<u8>, String> {
     file.read_to_end(&mut encrypted)
         .map_err(|e| format!("Failed to read encrypted file: {}", e))?;
     
-    decrypt_data(&encrypted)
+    // Auto-detect encryption version from header
+    if encrypted.len() >= 8 {
+        let header = &encrypted[..8];
+        if header == ENCRYPTED_HEADER_V2 {
+            // V2: Kyber-AES-GCM — get secret key from obfuscated parts
+            let sk = super::key_obfuscation::get_kyber_secret_key();
+            return kyber_decrypt_data(&encrypted, &sk);
+        } else if header == ENCRYPTED_HEADER_V1 {
+            // V1: Legacy AES-only
+            return decrypt_data(&encrypted);
+        }
+    }
+    
+    Err("Unknown encryption format or corrupted file".to_string())
 }
 
 /// Check if a file is encrypted (has V1 or V2 header)
