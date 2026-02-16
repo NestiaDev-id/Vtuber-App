@@ -46,6 +46,26 @@ Berisi semua model karakter dan aset berat lainnya.
 
 ---
 
+## 🔑 Keamanan & Kunci (Keys)
+
+Proses build dan rilis menggunakan dua jenis kunci yang berbeda:
+
+### 1. Tauri Signing Key (Untuk Update)
+Digunakan untuk menandatangani binary agar fitur Updater berfungsi.
+- **File**: `src-tauri/tauri.key` (⚠️ JANGAN HILANG!)
+- **Config**: Public key harus ada di `tauri.conf.json` -> `plugins.updater.pubkey`.
+- **Environment**: Pastikan variable berikut ada di `.env`:
+  ```env
+  TAURI_SIGNING_PRIVATE_KEY="isi_dari_file_tauri_key"
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD="password_kunci_anda"
+  ```
+
+### 2. Kyber-AES-GCM (Untuk Konten)
+Digunakan untuk mengunci aset di `Content/Official` agar tidak bisa dibajak.
+- **Panduan Lengkap**: Lihat [Encryption Guide](../release/encryption_guide.md)
+
+---
+
 ## ☁️ Langkah Distribusi
 
 1. Buat **New Release** di GitHub Repository Anda.
@@ -55,3 +75,4 @@ Berisi semua model karakter dan aset berat lainnya.
    - (Optional) `VTuber_Installer.exe` (Hasil build dari `installer_project`)
 
 Installer akan secara otomatis mencari file dengan nama tersebut di URL Release terbaru.
+

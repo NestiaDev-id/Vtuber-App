@@ -31,13 +31,24 @@ pub fn run() {
             let uri = request.uri().path();
             let _app = ctx.app_handle();
             
-            // Get asset path from URI - resolve relative to executable directory
-            let exe_dir = std::env::current_exe()
+            // Resolve Content directory
+            // 1. Try relative to executable (Production/Standard)
+            let mut content_dir = std::env::current_exe()
                 .ok()
-                .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-                .unwrap_or_else(|| std::path::PathBuf::from("."));
+                .and_then(|p| p.parent().map(|p| p.join("Content")))
+                .unwrap_or_else(|| std::path::PathBuf::from("Content"));
             
-            let content_dir = exe_dir.join("Content");
+            // 2. Fallback to Project Root (Development)
+            // This allows deleting src-tauri/Content and using the root Content folder instead
+            if !content_dir.exists() {
+                if let Ok(cwd) = std::env::current_dir() {
+                    let project_root_content = cwd.join("Content");
+                    if project_root_content.exists() {
+                        content_dir = project_root_content;
+                    }
+                }
+            }
+
             let relative_path = uri.trim_start_matches('/');
             
             // Priority lookup: Custom (user mods) -> Official (encrypted)

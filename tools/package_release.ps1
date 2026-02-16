@@ -24,27 +24,51 @@ Write-Host "=== VTuber App Packaging Script ===" -ForegroundColor Cyan
 Write-Host "  Project Root: $ProjectRoot" -ForegroundColor Gray
 
 # ============================================================
-# Step 0: Validate .env keys exist
+# Step 0: Validate .env and load variables
 # ============================================================
-Write-Host "`n[0/5] Validating .env for Kyber keys..." -ForegroundColor Yellow
+Write-Host "`n[0/5] Validating & Loading environment..." -ForegroundColor Yellow
 $EnvFile = Join-Path $ProjectRoot ".env"
 
-if (-not (Test-Path $EnvFile)) {
-    Write-Host "  WARNING: .env not found at $EnvFile" -ForegroundColor Red
-    Write-Host "  Decryption at runtime will NOT work without keys." -ForegroundColor Red
-    Write-Host "  Run: cd src-tauri && cargo run --bin encrypt_content -- --generate-keys" -ForegroundColor Gray
-} else {
-    $envContent = Get-Content $EnvFile -Raw
-    $hasPK = $envContent -match "KYBER_PUBLIC_KEY=.+"
-    $hasSK = $envContent -match "KYBER_SECRET_KEY=.+"
-    
-    if ($hasPK -and $hasSK) {
-        Write-Host "  OK Kyber keys found in .env" -ForegroundColor Green
-    } else {
-        Write-Host "  WARNING: Kyber keys missing in .env" -ForegroundColor Red
-        Write-Host "  Run: cd src-tauri && cargo run --bin encrypt_content -- --generate-keys" -ForegroundColor Gray
+# 0.1 Load .env if exists
+if (Test-Path $EnvFile) {
+    Get-Content $EnvFile | ForEach-Object {
+        if ($_ -match '^(?<name>[^#\s]+)=(?<value>.+)$') {
+            $name = $Matches['name'].Trim()
+            $value = $Matches['value'].Trim().Trim('"').Trim("'")
+            [Environment]::SetEnvironmentVariable($name, $value)
+        }
     }
 }
+
+# 0.2 Auto-detect & Encode Tauri Private Key
+$AutoTauriKey = Join-Path $ProjectRoot "src-tauri\tauri.key"
+if (Test-Path $AutoTauriKey) {
+    # Read raw bytes and encode to Base64 - this is the most robust way for Tauri CLI
+    $KeyBytes = [System.IO.File]::ReadAllBytes($AutoTauriKey)
+    $Base64Key = [System.Convert]::ToBase64String($KeyBytes)
+    $env:TAURI_SIGNING_PRIVATE_KEY = $Base64Key
+    Write-Host "  OK Auto-detected & encoded Tauri key" -ForegroundColor Green
+}
+
+# 0.3 Verify critical variables
+$hasPK = [Environment]::GetEnvironmentVariable("KYBER_PUBLIC_KEY")
+$hasSK = [Environment]::GetEnvironmentVariable("KYBER_SECRET_KEY")
+$hasTauriKey = [Environment]::GetEnvironmentVariable("TAURI_SIGNING_PRIVATE_KEY")
+$hasTauriPass = [Environment]::GetEnvironmentVariable("TAURI_SIGNING_PRIVATE_KEY_PASSWORD")
+
+if ($hasPK -and $hasSK) {
+    Write-Host "  OK Kyber keys loaded" -ForegroundColor Green
+}
+if ($hasTauriKey) {
+    if ($hasTauriPass) {
+        Write-Host "  OK Tauri signing key & password ready" -ForegroundColor Green
+    } else {
+        Write-Host "  NOTE: Tauri key found but password is empty (assumed no password)" -ForegroundColor Gray
+    }
+} else {
+    Write-Host "  WARNING: TAURI_SIGNING_PRIVATE_KEY not found (build may fail signing)" -ForegroundColor Red
+}
+
 
 # ============================================================
 # Step 1: Build the main app (if not skipped)
