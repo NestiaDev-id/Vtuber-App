@@ -100,7 +100,7 @@ pub async fn init_memory_db(app: tauri::AppHandle, custom_path: Option<String>) 
     let db_path = if let Some(path) = custom_path {
         PathBuf::from(path)
     } else {
-        // Fallback to settings or default
+        // Check settings for custom memory path
         let settings_path = app.path().app_data_dir().unwrap().join("api_settings.json");
         let settings_mem_path = if settings_path.exists() {
             let content = std::fs::read_to_string(&settings_path).unwrap_or_default();
@@ -113,9 +113,13 @@ pub async fn init_memory_db(app: tauri::AppHandle, custom_path: Option<String>) 
         if let Some(path) = settings_mem_path {
             PathBuf::from(path)
         } else {
-            app.path().app_data_dir()
-                .map_err(|e| format!("Failed to get app data dir: {}", e))?
-                .join("vector_db")
+            // Default: Store in <exe_dir>/UserData/ (per implementation plan)
+            // This keeps all user data inside the application folder
+            let exe_dir = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+                .unwrap_or_else(|| std::path::PathBuf::from("."));
+            exe_dir.join("UserData")
         }
     };
     

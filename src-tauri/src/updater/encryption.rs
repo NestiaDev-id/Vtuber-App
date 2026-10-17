@@ -1,6 +1,6 @@
 // Post-Quantum Ready Asset Encryption
-// Uses AES-256-GCM for data encryption with hardware-derived keys
-// Kyber integration placeholder for future quantum-resistant key exchange
+// Uses Kyber-1024 KEM + AES-256-GCM for hybrid post-quantum encryption
+// Backward compatible with VTENC001 (legacy AES-only)
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -9,9 +9,41 @@ use aes_gcm::{
 use sha2::{Sha256, Digest};
 use std::path::PathBuf;
 use std::io::{Read, Write};
+use pqc_kyber::*;
 
-/// Encrypted file header magic bytes
-const ENCRYPTED_HEADER: &[u8; 8] = b"VTENC001";
+/// Custom RNG wrapper that implements pqc_kyber's RngCore + CryptoRng traits
+/// This bridges the rand_core 0.6 (pqc_kyber) vs 0.9 (rand) version incompatibility
+struct KyberRng;
+
+impl rand_core::RngCore for KyberRng {
+    fn next_u32(&mut self) -> u32 {
+        let mut buf = [0u8; 4];
+        getrandom::getrandom(&mut buf).expect("getrandom failed");
+        u32::from_le_bytes(buf)
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let mut buf = [0u8; 8];
+        getrandom::getrandom(&mut buf).expect("getrandom failed");
+        u64::from_le_bytes(buf)
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        getrandom::getrandom(dest).expect("getrandom failed");
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+        getrandom::getrandom(dest).map_err(|e| rand_core::Error::new(e))
+    }
+}
+
+impl rand_core::CryptoRng for KyberRng {}
+
+
+/// Encrypted file header magic bytes (legacy AES-only)
+const ENCRYPTED_HEADER_V1: &[u8; 8] = b"VTENC001";
+/// Encrypted file header magic bytes (Kyber-AES-GCM hybrid)
+const ENCRYPTED_HEADER_V2: &[u8; 8] = b"VTENC002";
 
 /// Nonce size for AES-GCM (96 bits = 12 bytes)
 const NONCE_SIZE: usize = 12;
@@ -25,7 +57,7 @@ fn get_app_salt() -> Vec<u8> {
     }
 }
 
-/// Derive a unique 256-bit key from hardware fingerprint
+/// Derive a unique 256-bit key from hardware fingerprint (legacy, for V1)
 pub fn derive_key() -> Result<[u8; 32], String> {
     let hardware_id = get_hardware_fingerprint()?;
     
@@ -78,8 +110,113 @@ fn get_hardware_fingerprint() -> Result<Vec<u8>, String> {
     Ok(fingerprint)
 }
 
-/// Encrypt data using AES-256-GCM with derived key
-/// Note: This function is for build tools (offline). Use decrypt_data at runtime.
+// ============================================================
+// Kyber-AES-GCM Hybrid Encryption (V2 - Post-Quantum)
+// ============================================================
+
+/// Encrypt data using Kyber-1024 KEM + AES-256-GCM hybrid encryption
+/// Returns: HEADER + KYBER_CIPHERTEXT + NONCE + AES_CIPHERTEXT
+#[allow(dead_code)]
+pub fn kyber_encrypt_data(plaintext: &[u8], public_key: &[u8]) -> Result<Vec<u8>, String> {
+    // 1. Encapsulate: Generate shared secret using recipient's public key
+    let pk: [u8; KYBER_PUBLICKEYBYTES] = public_key.try_into()
+        .map_err(|_| "Invalid Kyber public key length")?;
+    
+    // Use custom KyberRng for cryptographic randomness (compatible with pqc_kyber's rand_core 0.6)
+    let mut rng = KyberRng;
+    let (kyber_ciphertext, shared_secret) = encapsulate(&pk, &mut rng)
+        .map_err(|_| "Kyber encapsulation failed")?;
+    
+    // 2. Derive AES key from shared secret
+    let mut hasher = Sha256::new();
+    hasher.update(&shared_secret);
+    hasher.update(&get_app_salt());
+    let aes_key: [u8; 32] = hasher.finalize().into();
+    
+    // 3. Encrypt with AES-256-GCM
+    let cipher = Aes256Gcm::new_from_slice(&aes_key)
+        .map_err(|e| format!("Failed to create cipher: {}", e))?;
+    
+    let nonce_bytes: [u8; NONCE_SIZE] = rand::random();
+    let nonce = Nonce::from_slice(&nonce_bytes);
+    
+    let aes_ciphertext = cipher.encrypt(nonce, plaintext)
+        .map_err(|e| format!("AES encryption failed: {}", e))?;
+    
+    // 4. Build output: HEADER + KYBER_CIPHERTEXT + NONCE + AES_CIPHERTEXT
+    let mut output = Vec::with_capacity(
+        ENCRYPTED_HEADER_V2.len() + KYBER_CIPHERTEXTBYTES + NONCE_SIZE + aes_ciphertext.len()
+    );
+    output.extend_from_slice(ENCRYPTED_HEADER_V2);
+    output.extend_from_slice(&kyber_ciphertext);
+    output.extend_from_slice(&nonce_bytes);
+    output.extend_from_slice(&aes_ciphertext);
+    
+    Ok(output)
+}
+
+/// Decrypt data using Kyber-1024 KEM + AES-256-GCM hybrid decryption
+pub fn kyber_decrypt_data(encrypted: &[u8], secret_key: &[u8]) -> Result<Vec<u8>, String> {
+    let min_len = ENCRYPTED_HEADER_V2.len() + KYBER_CIPHERTEXTBYTES + NONCE_SIZE;
+    if encrypted.len() < min_len {
+        return Err("Invalid encrypted data: too short".to_string());
+    }
+    
+    // Verify header
+    let header = &encrypted[..ENCRYPTED_HEADER_V2.len()];
+    if header != ENCRYPTED_HEADER_V2 {
+        return Err("Invalid encrypted data: wrong header (expected VTENC002)".to_string());
+    }
+    
+    // Extract components
+    let kyber_start = ENCRYPTED_HEADER_V2.len();
+    let kyber_end = kyber_start + KYBER_CIPHERTEXTBYTES;
+    let nonce_end = kyber_end + NONCE_SIZE;
+    
+    let kyber_ct: [u8; KYBER_CIPHERTEXTBYTES] = encrypted[kyber_start..kyber_end]
+        .try_into()
+        .map_err(|_| "Invalid Kyber ciphertext length")?;
+    let nonce_bytes = &encrypted[kyber_end..nonce_end];
+    let aes_ciphertext = &encrypted[nonce_end..];
+    
+    // 1. Decapsulate: Recover shared secret
+    let sk: [u8; KYBER_SECRETKEYBYTES] = secret_key.try_into()
+        .map_err(|_| "Invalid Kyber secret key length")?;
+    
+    let shared_secret = decapsulate(&kyber_ct, &sk)
+        .map_err(|_| "Kyber decapsulation failed")?;
+    
+    // 2. Derive AES key
+    let mut hasher = Sha256::new();
+    hasher.update(&shared_secret);
+    hasher.update(&get_app_salt());
+    let aes_key: [u8; 32] = hasher.finalize().into();
+    
+    // 3. Decrypt with AES-256-GCM
+    let cipher = Aes256Gcm::new_from_slice(&aes_key)
+        .map_err(|e| format!("Failed to create cipher: {}", e))?;
+    let nonce = Nonce::from_slice(nonce_bytes);
+    
+    let plaintext = cipher.decrypt(nonce, aes_ciphertext)
+        .map_err(|_| "Decryption failed: invalid key or corrupted data".to_string())?;
+    
+    Ok(plaintext)
+}
+
+/// Generate a new Kyber-1024 keypair
+#[allow(dead_code)]
+pub fn generate_kyber_keypair() -> Result<(Vec<u8>, Vec<u8>), String> {
+    let mut rng = KyberRng;
+    let keys = keypair(&mut rng)
+        .map_err(|_| "Failed to generate Kyber keypair")?;
+    Ok((keys.public.to_vec(), keys.secret.to_vec()))
+}
+
+// ============================================================
+// Legacy AES-256-GCM Encryption (V1 - Backward Compatibility)
+// ============================================================
+
+/// Encrypt data using AES-256-GCM with derived key (LEGACY V1)
 #[allow(dead_code)]
 pub fn encrypt_data(plaintext: &[u8]) -> Result<Vec<u8>, String> {
     let key = derive_key()?;
@@ -95,28 +232,28 @@ pub fn encrypt_data(plaintext: &[u8]) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Encryption failed: {}", e))?;
     
     // Build output: HEADER + NONCE + CIPHERTEXT
-    let mut output = Vec::with_capacity(ENCRYPTED_HEADER.len() + NONCE_SIZE + ciphertext.len());
-    output.extend_from_slice(ENCRYPTED_HEADER);
+    let mut output = Vec::with_capacity(ENCRYPTED_HEADER_V1.len() + NONCE_SIZE + ciphertext.len());
+    output.extend_from_slice(ENCRYPTED_HEADER_V1);
     output.extend_from_slice(&nonce_bytes);
     output.extend_from_slice(&ciphertext);
     
     Ok(output)
 }
 
-/// Decrypt data using AES-256-GCM with derived key
+/// Decrypt data using AES-256-GCM with derived key (LEGACY V1)
 pub fn decrypt_data(encrypted: &[u8]) -> Result<Vec<u8>, String> {
     // Verify header
-    if encrypted.len() < ENCRYPTED_HEADER.len() + NONCE_SIZE {
+    if encrypted.len() < ENCRYPTED_HEADER_V1.len() + NONCE_SIZE {
         return Err("Invalid encrypted data: too short".to_string());
     }
     
-    let header = &encrypted[..ENCRYPTED_HEADER.len()];
-    if header != ENCRYPTED_HEADER {
-        return Err("Invalid encrypted data: wrong header".to_string());
+    let header = &encrypted[..ENCRYPTED_HEADER_V1.len()];
+    if header != ENCRYPTED_HEADER_V1 {
+        return Err("Invalid encrypted data: wrong header (expected VTENC001)".to_string());
     }
     
     // Extract nonce and ciphertext
-    let nonce_start = ENCRYPTED_HEADER.len();
+    let nonce_start = ENCRYPTED_HEADER_V1.len();
     let nonce_end = nonce_start + NONCE_SIZE;
     let nonce_bytes = &encrypted[nonce_start..nonce_end];
     let ciphertext = &encrypted[nonce_end..];
@@ -161,6 +298,7 @@ pub fn encrypt_file(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
 }
 
 /// Decrypt a file and return contents in memory (no disk write)
+/// Auto-detects V1 (legacy AES) vs V2 (Kyber-AES-GCM) encryption
 pub fn decrypt_file_to_memory(src: &PathBuf) -> Result<Vec<u8>, String> {
     let mut file = std::fs::File::open(src)
         .map_err(|e| format!("Failed to open encrypted file: {}", e))?;
@@ -169,15 +307,28 @@ pub fn decrypt_file_to_memory(src: &PathBuf) -> Result<Vec<u8>, String> {
     file.read_to_end(&mut encrypted)
         .map_err(|e| format!("Failed to read encrypted file: {}", e))?;
     
-    decrypt_data(&encrypted)
+    // Auto-detect encryption version from header
+    if encrypted.len() >= 8 {
+        let header = &encrypted[..8];
+        if header == ENCRYPTED_HEADER_V2 {
+            // V2: Kyber-AES-GCM — get secret key from obfuscated parts
+            let sk = super::key_obfuscation::get_kyber_secret_key();
+            return kyber_decrypt_data(&encrypted, &sk);
+        } else if header == ENCRYPTED_HEADER_V1 {
+            // V1: Legacy AES-only
+            return decrypt_data(&encrypted);
+        }
+    }
+    
+    Err("Unknown encryption format or corrupted file".to_string())
 }
 
-/// Check if a file is encrypted (has our header)
+/// Check if a file is encrypted (has V1 or V2 header)
 pub fn is_encrypted(src: &PathBuf) -> bool {
     if let Ok(mut file) = std::fs::File::open(src) {
         let mut header = [0u8; 8];
         if file.read_exact(&mut header).is_ok() {
-            return &header == ENCRYPTED_HEADER;
+            return &header == ENCRYPTED_HEADER_V1 || &header == ENCRYPTED_HEADER_V2;
         }
     }
     false

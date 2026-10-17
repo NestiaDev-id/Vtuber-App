@@ -6,7 +6,7 @@ use tokio::io::AsyncWriteExt;
 use tauri::{AppHandle, Emitter};
 use super::{UpdateProgress, UpdateStage};
 
-/// Download a file with resume support and progress events
+/// Download a file with resume support, progress events, and optional speed limiting
 pub async fn download_file(
     app: &AppHandle,
     url: &str,
@@ -15,6 +15,7 @@ pub async fn download_file(
     file_name: &str,
     files_completed: u32,
     files_total: u32,
+    speed_limit_kbps: Option<u32>,
 ) -> Result<(), String> {
     let client = Client::new();
     
@@ -58,12 +59,35 @@ pub async fn download_file(
 
     let mut stream = response.bytes_stream();
     let mut downloaded = start_pos;
+    
+    // For speed limiting: track bytes downloaded in current second
+    let mut bytes_this_second: u64 = 0;
+    let mut last_reset = std::time::Instant::now();
+    let bytes_per_second_limit = speed_limit_kbps.map(|kbps| (kbps as u64) * 1024);
 
     use futures::StreamExt;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| e.to_string())?;
         file.write_all(&chunk).await.map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
+
+        // Speed limiting logic
+        if let Some(limit) = bytes_per_second_limit {
+            bytes_this_second += chunk.len() as u64;
+            
+            // Check if we've exceeded the limit for this second
+            if bytes_this_second >= limit {
+                let elapsed = last_reset.elapsed();
+                if elapsed < std::time::Duration::from_secs(1) {
+                    // Sleep for remaining time in the second
+                    let sleep_duration = std::time::Duration::from_secs(1) - elapsed;
+                    tokio::time::sleep(sleep_duration).await;
+                }
+                // Reset counter for next second
+                bytes_this_second = 0;
+                last_reset = std::time::Instant::now();
+            }
+        }
 
         // Emit progress event (throttled to avoid too many events)
         if downloaded % (1024 * 100) < chunk.len() as u64 || downloaded >= expected_size {

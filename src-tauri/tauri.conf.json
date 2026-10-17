@@ -18,7 +18,8 @@
         "width": 1200,
         "height": 800,
         "minWidth": 800,
-        "minHeight": 600
+        "minHeight": 600,
+        "decorations": false
       },
       {
         "label": "vtuber",
@@ -60,7 +61,7 @@
       "endpoints": [
         "https://github.com/NestiaDev-id/Vtuber-App/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg0RTJFRkZENjhDQjk3ODkKUldTSmw4dG8vZS9paEl6SFVKeHNqcXVaQkJra3pTSzdVTFdnbVVBTlA3R1dVVFZ3UkNoSERLTG0K"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYxNUU2RjJBNzZGNzc0RkIKUldUN2RQZDJLbTllOGVNTEhNOENONjNFSUtZdFpEcnlIQmR2Um9QZmVrNWs0R0o0R1V5c3RJSUkK"
     }
   }
 }

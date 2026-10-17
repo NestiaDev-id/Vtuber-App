@@ -118,3 +118,66 @@ pub async fn test_api_connection(app: AppHandle, settings: ApiSettings) -> Resul
         Err(e) => Ok(serde_json::json!({ "success": false, "message": format!("Connection failed: {}", e) })),
     }
 }
+
+// ========================================
+// Launcher Settings (UI Preferences)
+// ========================================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LauncherSettings {
+    pub language: String,
+    pub auto_launch_on_startup: bool,
+    pub check_updates_on_startup: bool,
+    pub installation_path: String,
+    pub speed_limit_enabled: bool,
+    #[serde(rename = "speedLimitKBps")]
+    pub speed_limit_kbps: u32,
+    pub allow_desktop_notifications: bool,
+    pub notify_on_update: bool,
+    pub notify_on_download_complete: bool,
+}
+
+impl Default for LauncherSettings {
+    fn default() -> Self {
+        LauncherSettings {
+            language: "English".to_string(),
+            auto_launch_on_startup: false,
+            check_updates_on_startup: true,
+            installation_path: "C:\\Games\\VTuber-App".to_string(),
+            speed_limit_enabled: false,
+            speed_limit_kbps: 4096,
+            allow_desktop_notifications: false,
+            notify_on_update: true,
+            notify_on_download_complete: true,
+        }
+    }
+}
+
+fn get_launcher_settings_path(app: &AppHandle) -> PathBuf {
+    app.path().app_data_dir().unwrap().join("launcher_settings.json")
+}
+
+#[tauri::command]
+pub fn get_launcher_settings(app: AppHandle) -> LauncherSettings {
+    let path = get_launcher_settings_path(&app);
+    if path.exists() {
+        let content = fs::read_to_string(&path).unwrap_or_default();
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        LauncherSettings::default()
+    }
+}
+
+#[tauri::command]
+pub fn save_launcher_settings(app: AppHandle, settings: LauncherSettings) -> Result<String, String> {
+    let path = get_launcher_settings_path(&app);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    
+    let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+    fs::write(path, json).map_err(|e| e.to_string())?;
+    
+    Ok("Launcher settings saved".to_string())
+}

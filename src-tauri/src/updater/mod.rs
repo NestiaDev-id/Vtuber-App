@@ -6,6 +6,7 @@ pub mod downloader;
 pub mod patcher;
 pub mod verify;
 pub mod encryption;
+pub mod key_obfuscation;
 
 use serde::{Deserialize, Serialize};
 

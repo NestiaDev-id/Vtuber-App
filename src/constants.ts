@@ -1,7 +1,7 @@
 import { NewsItem, GameVersion } from './types';
 
 export const CURRENT_VERSION: GameVersion = {
-  version: "1.2.0",
+  version: "0.2.0",
   size: "14.5 GB",
   downloadSizeMB: 4500 // 4.5GB
 };
@@ -16,13 +16,13 @@ export const BACKGROUND_IMAGES = [
 export const NEWS_ITEMS: NewsItem[] = [
   {
     id: '1',
-    title: "Version 1.2 'Echoes of the Void' Now Available",
+    title: "Version 0.2.0 'Echoes of the Void' Now Available",
     category: 'INFO',
     date: '2024-05-22',
     image: 'https://picsum.photos/id/237/600/300',
     content: `Greetings, Travelers!
 
-We are thrilled to announce that Version 1.2 "Echoes of the Void" is now live! This update brings a massive expansion to the Aetheria map, introducing the mysterious Voidlands region.
+We are thrilled to announce that Version 0.2.0 "Echoes of the Void" is now live! This update brings a massive expansion to the Aetheria map, introducing the mysterious Voidlands region.
 
 **Update Highlights:**
 
@@ -95,6 +95,23 @@ We apologize for the inconvenience and appreciate your patience. A compensation 
 
 Happy gaming!
 - The Aetheria Dev Team`
+  },
+  {
+    id: '5',
+    title: "Scheduled Maintenance: System Optimization",
+    category: 'NOTICE',
+    date: '2024-06-10',
+    image: 'https://picsum.photos/id/160/600/300',
+    content: `Attention all users,
+
+A scheduled maintenance is planned for June 10th to optimize system performance and database stability.
+
+**Timeline:**
+June 10th, 10:00 AM - 12:00 PM (UTC).
+
+Services might be intermittent during this window. We appreciate your cooperation.
+
+- Operations Team`
   }
 ];
 

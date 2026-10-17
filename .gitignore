@@ -23,11 +23,34 @@ dist-ssr
 src-tauri/target/
 src-tauri/WixTools/
 src-tauri/binaries/*.exe
+src-tauri/keys/
+src-tauri/Content/Official/*
+
+# User Data & History
+UserData/
+**/UserData/
 
 # Large assets (delivered via updater instead)
+Content/*
+release/*.zip
+release/*.json
+release/*.msi
+release/*.exe
 public/vtuber_chara/
 public/background/
 public/memory/
+installer_project/
+keys/
+*.bin
+*.vtenc
+*.vtdec
+*.vtkey
+*.vtkey.bk
+*.txt
+*.key
+*.pem
+*.bin
+*.pub
 
 # Editor directories and files
 .vscode/*

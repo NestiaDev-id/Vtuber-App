@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import BackgroundCarousel from './launcher/BackgroundCarousel';
 import Sidebar from './launcher/Sidebar';
@@ -133,13 +134,28 @@ const LauncherStage: React.FC<LauncherStageProps> = ({
       <BackgroundCarousel />
 
       {/* 2. UI Overlay Layer */}
-      <div className="relative z-10 w-full h-full">
+      <div className="relative z-10 w-full h-full flex flex-col">
         
-        {/* Top Right Window Controls */}
-        <div className="absolute top-0 right-0 p-4 flex gap-4 text-gray-400 z-50">
-          <button className="hover:text-white transition-colors">_</button>
-          <button className="hover:text-white transition-colors">☐</button>
-          <button className="hover:text-red-500 transition-colors">✕</button>
+        {/* Top Window Controls & Drag Region */}
+        <div 
+          data-tauri-drag-region 
+          className="w-full flex justify-end items-center p-4 gap-4 text-gray-400 z-50  transition-colors"
+        >
+          <div className="flex-1 h-full" data-tauri-drag-region></div>
+          <button 
+            onClick={() => getCurrentWindow().minimize()}
+            className="text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 group"
+            title="Minimize"
+          >
+            <div className="w-3 h-[2px] bg-current mt-[2px]"></div>
+          </button>
+          <button 
+            onClick={() => getCurrentWindow().close()}
+            className="text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"
+            title="Close"
+          >
+            ✕
+          </button>
         </div>
 
         <Sidebar />
@@ -148,6 +164,7 @@ const LauncherStage: React.FC<LauncherStageProps> = ({
           status={status} 
           setStatus={setStatus}
           progress={progress}
+          manifestDiff={manifestDiff}
           onStartUpdate={handleStartUpdate}
           onOpenSettings={() => setIsSettingsOpen(true)}
         />

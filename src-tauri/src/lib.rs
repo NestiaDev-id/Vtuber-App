@@ -15,8 +15,8 @@ async fn set_click_through(window: tauri::Window, enable: bool) -> Result<(), St
     window.set_ignore_cursor_events(enable)
         .map_err(|e| e.to_string())
 }
-use std::path::PathBuf;
-use tauri::Manager;
+
+
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,22 +25,58 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Custom URI Protocol for encrypted assets
-        // Usage: vt-asset://path/to/encrypted/file.png
+        // Usage: vt-asset://path/to/file.png
+        // Supports both Official (encrypted) and Custom (plain) content
         .register_uri_scheme_protocol("vt-asset", |ctx, request| {
             let uri = request.uri().path();
-            let app = ctx.app_handle();
+            let _app = ctx.app_handle();
             
-            // Get asset path from URI
-            let data_dir = app.path().app_data_dir()
-                .unwrap_or_else(|_| PathBuf::from("."));
-            let asset_path = data_dir.join("assets").join(uri.trim_start_matches('/'));
+            // Resolve Content directory
+            // 1. Try relative to executable (Production/Standard)
+            let mut content_dir = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|p| p.join("Content")))
+                .unwrap_or_else(|| std::path::PathBuf::from("Content"));
+            
+            // 2. Fallback to Project Root (Development)
+            // This allows deleting src-tauri/Content and using the root Content folder instead
+            if !content_dir.exists() {
+                if let Ok(cwd) = std::env::current_dir() {
+                    let project_root_content = cwd.join("Content");
+                    if project_root_content.exists() {
+                        content_dir = project_root_content;
+                    }
+                }
+            }
+
+            let relative_path = uri.trim_start_matches('/');
+            
+            // Priority lookup: Custom (user mods) -> Official (encrypted)
+            // This allows users to override official content with custom mods
+            let custom_path = content_dir.join("Custom").join(relative_path);
+            let official_path = content_dir.join("Official").join(relative_path);
+            
+            // Also check for encrypted version in Official folder
+            let official_vtenc_path = content_dir.join("Official")
+                .join(format!("{}.vtenc", relative_path.trim_end_matches(".model3.json").trim_end_matches(".png").trim_end_matches(".jpg")));
+            
+            let asset_path = if custom_path.exists() {
+                custom_path // User custom content (plain)
+            } else if official_path.exists() {
+                official_path // Official content (may be encrypted)
+            } else if official_vtenc_path.exists() {
+                official_vtenc_path // Encrypted official content
+            } else {
+                // Fallback: direct path under Content/ for backward compatibility
+                content_dir.join(relative_path)
+            };
             
             // Check if file exists
             if !asset_path.exists() {
                 return tauri::http::Response::builder()
                     .status(404)
                     .header("Content-Type", "text/plain")
-                    .body(Vec::from("Asset not found"))
+                    .body(Vec::from(format!("Asset not found: {:?}", asset_path)))
                     .unwrap();
             }
             
@@ -63,7 +99,17 @@ pub fn run() {
             };
             
             // Guess content type from extension
-            let content_type = match asset_path.extension().and_then(|e| e.to_str()) {
+            // For .vtenc files, strip the encrypted extension to detect the original type
+            // e.g., "model.png.vtenc" -> detect from "model.png" -> "image/png"
+            let type_path = {
+                let path_str = asset_path.to_string_lossy();
+                if path_str.ends_with(".vtenc") {
+                    std::path::PathBuf::from(path_str.trim_end_matches(".vtenc"))
+                } else {
+                    asset_path.clone()
+                }
+            };
+            let content_type = match type_path.extension().and_then(|e| e.to_str()) {
                 Some("png") => "image/png",
                 Some("jpg") | Some("jpeg") => "image/jpeg",
                 Some("json") => "application/json",
@@ -109,6 +155,8 @@ pub fn run() {
             updater::encryption::check_asset_encryption,
             commands::batch_label_memories,
             commands::get_labeling_stats,
+            commands::get_launcher_settings,
+            commands::save_launcher_settings,
             set_click_through
         ])
         .run(tauri::generate_context!())

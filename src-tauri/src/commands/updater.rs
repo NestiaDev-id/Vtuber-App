@@ -4,6 +4,7 @@ use crate::updater::manifest::{Manifest, ManifestDiff};
 use crate::updater::downloader;
 use crate::updater::verify;
 use crate::updater::patcher;
+use crate::commands::settings::get_launcher_settings;
 use tauri::{AppHandle, Manager, Emitter};
 use std::path::PathBuf;
 
@@ -85,6 +86,14 @@ pub async fn apply_asset_updates(
     let assets_dir = get_assets_dir(&app)?;
     std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
 
+    // Read speed limit from settings
+    let launcher_settings = get_launcher_settings(app.clone());
+    let speed_limit = if launcher_settings.speed_limit_enabled {
+        Some(launcher_settings.speed_limit_kbps)
+    } else {
+        None
+    };
+
     // =============================================
     // Phase 1: Apply patches if available
     // =============================================
@@ -115,6 +124,7 @@ pub async fn apply_asset_updates(
                 &patch.file,
                 index as u32,
                 patches_total,
+                speed_limit,
             ).await?;
 
             // Apply patch using hpatchz
@@ -160,6 +170,7 @@ pub async fn apply_asset_updates(
             &asset.path,
             index as u32,
             files_total,
+            speed_limit,
         ).await?;
 
         // If it was a .zst file, decompress
